@@ -1,0 +1,54 @@
+version: '3.7'
+
+services:
+    redis:
+        image: redis:6
+        container_name: redis
+        ports:
+            - '6379:6379'
+        networks:
+            - nextcloud-network
+    docker:
+        image: docker:20-dind
+        container_name: docker-din
+        privileged: true
+        ports:
+            - '2376:2376'
+        networks:
+            - nextcloud-network
+        volumes:
+            - ./certs:/certs
+            - docker-data:/var/lib/docker
+        environment:
+            DOCKER_TLS_CERTDIR: '/certs'
+    processmaker:
+        image: processmaker/pm4-core:4.0-dev
+        container_name: processmaker
+        ports:
+            - '8080:443'
+        depends_on:
+            - mysql
+            - redis
+            - docker
+        networks:
+            - nextcloud-network
+        volumes:
+            - ./certs:/certs/
+            - ./.env:/opt/processmaker/.env
+            - processmaker-data:/opt/processmaker/storage
+            - ./pm-entrypoint.sh:/usr/bin/pm-entrypoint.sh
+            - ./test-services.sh:/bin/test-services.sh
+            - ./database.php:/opt/processmaker/config/database.php
+        environment:
+            WAIT_FOR_DEPENDENTS: 1
+            DOCKER_HOST: 'tcp://docker:2376'
+            DOCKER_CERT_PATH: '/certs/client'
+            DOCKER_TLS_VERIFY: 1
+            NO_PROXY: '127.0.0.1,localhost,docker:2376'
+
+networks:
+    nextcloud-network:
+        external: true
+volumes:
+    docker-data:
+    processmaker-data:
